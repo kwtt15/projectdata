@@ -1,16 +1,18 @@
 require("dotenv").config();
 const express = require("express"),
-  sql = require("mssql"),
+  sql = process.env.DATABASE_URL ? require("./postgres") : require("mssql"),
   path = require("path");
 const app = express();
 app.use("/api", (req, res, next) => {
   const origin = req.get("Origin");
+  let sameOrigin = false;
+  try { sameOrigin = new URL(origin).host === req.get("host"); } catch {}
   if (origin === "https://kwtt15.github.io") {
     res.set("Access-Control-Allow-Origin", origin);
     res.vary("Origin");
     res.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
-  } else if (origin && origin !== `${req.protocol}://${req.get("host")}`) {
+  } else if (origin && !sameOrigin) {
     return res.status(403).json({ error: "Origin not allowed" });
   }
   if (req.method === "OPTIONS") return res.sendStatus(204);
@@ -183,7 +185,7 @@ async function procedure(name, values) {
 app.get("/api/health", async (_, res) => {
   try {
     await query("SELECT 1 AS ok");
-    res.json({ ok: true, database: config.database, engine: "SQL Server" });
+    res.json({ ok: true, database: process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).pathname.slice(1) : config.database, engine: process.env.DATABASE_URL ? "PostgreSQL" : "SQL Server" });
   } catch (e) {
     failure(res, e);
   }
@@ -286,6 +288,24 @@ app.post("/api/payments", async (req, res) => {
       try {
         await tx.rollback();
       } catch (_) {}
+    failure(res, e);
+  }
+});
+app.post("/api/reception", async (req, res) => {
+  try {
+    const b = req.body;
+    const result = await procedure("sp_process_car_wash_booking", {
+      vehicle_id: b.vehicle_id,
+      package_id: b.package_id,
+      bay_id: b.bay_id,
+      staff_id: b.staff_id,
+      start_time: b.start_time?.replace("T", " "),
+      payment_method: status.payments[b.payment_method] || b.payment_method,
+      member_card_id: b.member_card_id || null,
+      paid_amount: b.paid_amount ?? null,
+    });
+    res.status(201).json(result.recordset?.[0] || { ok: true });
+  } catch (e) {
     failure(res, e);
   }
 });
@@ -568,24 +588,6 @@ app.post("/api/bookings/:id/complete", async (req, res) => {
     failure(res, e);
   }
 });
-app.post("/api/reception", async (req, res) => {
-  try {
-    const b = req.body;
-    const result = await procedure("sp_process_car_wash_booking", {
-      vehicle_id: b.vehicle_id,
-      package_id: b.package_id,
-      bay_id: b.bay_id,
-      staff_id: b.staff_id,
-      start_time: b.start_time?.replace("T", " "),
-      payment_method: status.payments[b.payment_method] || b.payment_method,
-      member_card_id: b.member_card_id || null,
-      paid_amount: b.paid_amount ?? null,
-    });
-    res.status(201).json(result.recordset?.[0] || { ok: true });
-  } catch (e) {
-    failure(res, e);
-  }
-});
 app.get("/api/reports/daily", async (req, res) => {
   try {
     let r = await query(
@@ -605,8 +607,9 @@ app.get(/^\/([a-z_]+\.html)$/, (req, res) => {
   res.sendFile(path.join(publicRoot, req.params[0]));
 });
 app.get("/", (_, res) => res.redirect("/dashboard.html"));
-app.listen(Number(process.env.PORT || 3000), () =>
+module.exports = app;
+if (require.main === module) app.listen(Number(process.env.PORT || 3000), () =>
   console.log(
-    "WASHY SQL Server http://localhost:" + (process.env.PORT || 3000),
+    "WASHY " + (process.env.DATABASE_URL ? "PostgreSQL" : "SQL Server") + " http://localhost:" + (process.env.PORT || 3000),
   ),
 );

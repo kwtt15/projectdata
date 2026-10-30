@@ -4,11 +4,18 @@
   "private": true,
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "build:public": "node scripts/build-public.cjs",
+    "test:postgres": "node scripts/test-postgres.cjs",
+    "export:sqlserver": "node scripts/export-sqlserver.cjs"
   },
   "dependencies": {
-    "express": "^4.21.2",
     "dotenv": "^16.4.7",
-    "mssql": "^11.0.1"
+    "express": "^4.21.2",
+    "mssql": "^11.0.1",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13"
   }
 }
