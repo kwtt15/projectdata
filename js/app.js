@@ -1066,7 +1066,9 @@ $("#toggle").onclick = () => {
   if (innerWidth < 721) document.body.classList.toggle("mobile-open");
   else document.body.classList.toggle("collapsed");
 };
+const isGitHubPages = window.location.hostname.endsWith(".github.io");
 async function request(url, opts = {}) {
+  if (isGitHubPages) throw Error("หน้าแสดงตัวอย่าง: การใช้งานข้อมูลต้องเชื่อมต่อ Node.js และ SQL Server");
   const response = await fetch(url, {
     ...opts,
     headers: { "Content-Type": "application/json" },
@@ -1076,6 +1078,15 @@ async function request(url, opts = {}) {
   return data;
 }
 async function loadFromServer() {
+  if (isGitHubPages) {
+    render();
+    const notice = document.createElement("div");
+    notice.className = "panel";
+    notice.setAttribute("role", "status");
+    notice.textContent = "หน้าแสดงตัวอย่างบน GitHub Pages — ยังไม่เชื่อมต่อฐานข้อมูล จึงไม่มีข้อมูลจริงและไม่สามารถบันทึกการจองได้";
+    document.querySelector("#content").prepend(notice);
+    return;
+  }
   try {
     db = await request("/api/bootstrap?ts=" + Date.now());
     render();
