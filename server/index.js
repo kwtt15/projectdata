@@ -15,7 +15,10 @@ app.use("/api", (req, res, next) => {
   }
   if (req.method === "OPTIONS") return res.sendStatus(204);
   const token = process.env.API_ACCESS_TOKEN;
-  if (token && req.get("Authorization") !== `Bearer ${token}`)
+  const publicRead = process.env.PUBLIC_READ_ONLY === "true" && ["GET", "HEAD"].includes(req.method);
+  const requiresToken = Boolean(token) || process.env.PUBLIC_READ_ONLY === "true";
+  const authenticated = Boolean(token) && req.get("Authorization") === `Bearer ${token}`;
+  if (!publicRead && requiresToken && !authenticated)
     return res.status(401).json({ error: "กรุณาระบุรหัสเชื่อมต่อ backend ให้ถูกต้อง" });
   next();
 });

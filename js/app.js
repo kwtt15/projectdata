@@ -1067,7 +1067,7 @@ $("#toggle").onclick = () => {
   else document.body.classList.toggle("collapsed");
 };
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
-let apiBase = isGitHubPages ? localStorage.getItem("washy_api_base") || "" : "";
+let apiBase = isGitHubPages ? localStorage.getItem("washy_api_base") || "https://expires-comment-chrome-soon.trycloudflare.com" : "";
 let apiToken = sessionStorage.getItem("washy_api_token") || "";
 function connectionPanel() {
   const panel = document.createElement("div");
