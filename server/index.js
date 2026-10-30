@@ -3,6 +3,22 @@ const express = require("express"),
   sql = require("mssql"),
   path = require("path");
 const app = express();
+app.use("/api", (req, res, next) => {
+  const origin = req.get("Origin");
+  if (origin === "https://kwtt15.github.io") {
+    res.set("Access-Control-Allow-Origin", origin);
+    res.vary("Origin");
+    res.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  } else if (origin && origin !== `${req.protocol}://${req.get("host")}`) {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  const token = process.env.API_ACCESS_TOKEN;
+  if (token && req.get("Authorization") !== `Bearer ${token}`)
+    return res.status(401).json({ error: "กรุณาระบุรหัสเชื่อมต่อ backend ให้ถูกต้อง" });
+  next();
+});
 app.use(express.json({ limit: "200kb" }));
 app.use("/api", (_, res, next) => {
   res.set("Cache-Control", "no-store");
@@ -576,7 +592,14 @@ app.get("/api/reports/daily", async (req, res) => {
     failure(res, e);
   }
 });
-app.use(express.static(path.resolve(__dirname, "..")));
+const publicRoot = path.resolve(__dirname, "..");
+for (const dir of ["css", "js", "images"])
+  app.use("/" + dir, express.static(path.join(publicRoot, dir), { dotfiles: "deny" }));
+app.get(/^\/([a-z_]+\.html)$/, (req, res) => {
+  const pages = new Set(["index.html", "dashboard.html", "bays.html", "bookings.html", "customers.html", "materials.html", "material_usage.html", "members.html", "payments.html", "reports.html", "services.html", "staff.html", "vehicles.html"]);
+  if (!pages.has(req.params[0])) return res.sendStatus(404);
+  res.sendFile(path.join(publicRoot, req.params[0]));
+});
 app.get("/", (_, res) => res.redirect("/dashboard.html"));
 app.listen(Number(process.env.PORT || 3000), () =>
   console.log(

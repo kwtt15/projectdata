@@ -1067,24 +1067,48 @@ $("#toggle").onclick = () => {
   else document.body.classList.toggle("collapsed");
 };
 const isGitHubPages = window.location.hostname.endsWith(".github.io");
+let apiBase = isGitHubPages ? localStorage.getItem("washy_api_base") || "" : "";
+let apiToken = sessionStorage.getItem("washy_api_token") || "";
+function connectionPanel() {
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  panel.innerHTML = '<form><strong>เชื่อมต่อฐานข้อมูลของคุณ</strong><p>กรอก HTTPS URL ของ backend และรหัสเชื่อมต่อที่ตั้งบนคอมของคุณ</p><input name="endpoint" type="url" placeholder="https://example.trycloudflare.com" required aria-label="Backend URL"><input name="token" type="password" placeholder="รหัสเชื่อมต่อ" aria-label="รหัสเชื่อมต่อ"><button type="submit">เชื่อมต่อ</button><button type="button">ตัดการเชื่อมต่อ</button><p role="status"></p></form>';
+  const form = panel.querySelector("form");
+  form.elements.endpoint.value = apiBase;
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    try {
+      const endpoint = new URL(form.elements.endpoint.value);
+      if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.pathname !== "/") throw Error("กรุณาใช้ HTTPS URL ของ backend โดยไม่มี path หรือรหัสผ่านใน URL");
+      apiBase = endpoint.origin;
+      apiToken = form.elements.token.value;
+      localStorage.setItem("washy_api_base", apiBase);
+      sessionStorage.setItem("washy_api_token", apiToken);
+      await loadFromServer();
+    } catch (error) { form.querySelector('[role="status"]').textContent = error.message; }
+  };
+  form.querySelector('[type="button"]').onclick = () => {
+    apiBase = ""; apiToken = "";
+    localStorage.removeItem("washy_api_base");
+    sessionStorage.removeItem("washy_api_token");
+    window.location.reload();
+  };
+  return panel;
+}
 async function request(url, opts = {}) {
-  if (isGitHubPages) throw Error("หน้าแสดงตัวอย่าง: การใช้งานข้อมูลต้องเชื่อมต่อ Node.js และ SQL Server");
-  const response = await fetch(url, {
+  if (isGitHubPages && !apiBase) throw Error("กรุณาเชื่อมต่อ backend ก่อน");
+  const response = await fetch(apiBase + url, {
     ...opts,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(apiToken ? { Authorization: "Bearer " + apiToken } : {}) },
   });
   const data = await response.json();
   if (!response.ok) throw Error(data.error || "API error");
   return data;
 }
 async function loadFromServer() {
-  if (isGitHubPages) {
+  if (isGitHubPages && !apiBase) {
     render();
-    const notice = document.createElement("div");
-    notice.className = "panel";
-    notice.setAttribute("role", "status");
-    notice.textContent = "หน้าแสดงตัวอย่างบน GitHub Pages — ยังไม่เชื่อมต่อฐานข้อมูล จึงไม่มีข้อมูลจริงและไม่สามารถบันทึกการจองได้";
-    document.querySelector("#content").prepend(notice);
+    document.querySelector("#content").prepend(connectionPanel());
     return;
   }
   try {
@@ -1096,6 +1120,8 @@ async function loadFromServer() {
       esc(e.message) +
       "</div>";
     console.error(e);
+  } finally {
+    if (isGitHubPages) document.querySelector("#content").prepend(connectionPanel());
   }
 }
 async function apiWrite(type, row, id) {
