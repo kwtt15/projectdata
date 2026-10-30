@@ -1120,7 +1120,6 @@ async function loadFromServer() {
       esc(e.message) +
       "</div>";
     console.error(e);
-  } finally {
     if (isGitHubPages) document.querySelector("#content").prepend(connectionPanel());
   }
 }

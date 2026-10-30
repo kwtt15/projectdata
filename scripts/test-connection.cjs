@@ -1,6 +1,6 @@
 const { spawn } = require('node:child_process');
 const assert = require('node:assert/strict');
-const child = spawn(process.execPath, ['server/index.js'], {env:{...process.env,PORT:'3197',API_ACCESS_TOKEN:process.env.TEST_NO_TOKEN === 'true' ? '' : 'test-only-token',PUBLIC_READ_ONLY:process.env.TEST_PUBLIC_READ || 'false',DB_SERVER:'127.0.0.1',DB_PORT:'1'},stdio:'ignore'});
+const child = spawn(process.execPath, ['server/index.js'], {env:{...process.env,PORT:'3197',API_ACCESS_TOKEN:process.env.TEST_NO_TOKEN === 'true' ? '' : 'test-only-token',PUBLIC_READ_ONLY:process.env.TEST_PUBLIC_READ || 'false',PUBLIC_FULL_ACCESS:process.env.TEST_FULL_ACCESS || 'false',DB_SERVER:'127.0.0.1',DB_PORT:'1'},stdio:'ignore'});
 (async()=>{
  try {
   let ready=false;
@@ -9,10 +9,12 @@ const child = spawn(process.execPath, ['server/index.js'], {env:{...process.env,
   for(const path of ['/server/index.js','/database/04_data.sql','/.env','/package.json']) assert.equal((await fetch('http://127.0.0.1:3197'+path)).status,404,path);
   assert.equal((await fetch('http://127.0.0.1:3197/dashboard.html')).status,200);
   const read=await fetch('http://127.0.0.1:3197/api/health');
-  if(process.env.TEST_PUBLIC_READ === 'true') assert.notEqual(read.status,401);
+  if(process.env.TEST_PUBLIC_READ === 'true' || process.env.TEST_FULL_ACCESS === 'true') assert.notEqual(read.status,401);
   else assert.equal(read.status,401);
   for(const method of ['POST','PUT','DELETE']) {
-    assert.equal((await fetch('http://127.0.0.1:3197/api/customers',{method})).status,401);
+    const result=await fetch('http://127.0.0.1:3197/api/customers/0',{method});
+    if(process.env.TEST_FULL_ACCESS === 'true') assert.notEqual(result.status,401,method);
+    else assert.equal(result.status,401,method);
   }
   const pre=await fetch('http://127.0.0.1:3197/api/health',{method:'OPTIONS',headers:{Origin:'https://kwtt15.github.io','Access-Control-Request-Headers':'authorization,content-type'}});
   assert.equal(pre.status,204);assert.equal(pre.headers.get('access-control-allow-origin'),'https://kwtt15.github.io');
