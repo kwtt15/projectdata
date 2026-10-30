@@ -1,0 +1,14 @@
+{
+  "name": "washy-er",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "dotenv": "^16.4.7",
+    "mssql": "^11.0.1"
+  }
+}
